@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Design system grounded in what this product actually is: a system for
+  OBSERVING an AI pipeline's reasoning in real time. Not a generic
+  violet-gradient AI-SaaS look -- a schematic/instrumentation aesthetic.
+
+  Color roles are functional, not decorative:
+    --trace  = "this step completed / data flowed through here"
+    --pulse  = "this step is executing right now"
+  Both colors are used ONLY for those two meanings anywhere in the app.
+*/
+:root {
+  --ink:    #0A0C10;
+  --ink-2:  #10131A;
+  --paper:  #ECEAE3;
+  --mute:   #888E99;
+  --line:   rgba(236, 234, 227, 0.10);
+  --line-2: rgba(236, 234, 227, 0.16);
+  --trace:  #4FD8C4;
+  --pulse:  #FF7A45;
+  --danger: #FF5C5C;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--ink);
+  color: var(--paper);
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  background:
+    radial-gradient(circle at 12% -5%, rgba(79,216,196,.14), transparent 28rem),
+    radial-gradient(circle at 88% 12%, rgba(255,122,69,.10), transparent 25rem),
+    linear-gradient(rgba(236,234,227,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(236,234,227,.025) 1px, transparent 1px);
+  background-size: auto, auto, 42px 42px, 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+::selection { background: rgba(79,216,196,.28); color: var(--paper); }
+
+.font-display { font-family: 'Space Grotesk', sans-serif; }
+.font-mono    { font-family: 'IBM Plex Mono', monospace; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mute); }
+
+/* Hairline rule -- used constantly instead of card shadows/borders-everywhere */
+.hairline { border-color: var(--line); }
+.hairline-strong { border-color: var(--line-2); }
+
+/* Panel: the one repeating surface treatment in the whole app. Flat, no
+   glassmorphism blur, no gradient border -- a schematic panel, not glass. */
+.panel {
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+}
+
+.panel-lift {
+  transition: transform .25s ease, border-color .25s ease, background .25s ease;
+}
+.panel-lift:hover { transform: translateY(-3px); border-color: rgba(79,216,196,.38); background: #141923; }
+.signal-grid { background-image: radial-gradient(rgba(79,216,196,.24) 1px, transparent 1px); background-size: 14px 14px; }
+.status-chip { border: 1px solid rgba(79,216,196,.28); background: rgba(79,216,196,.08); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Signal dot -- used in the pipeline strip and nowhere else as decoration */
+.signal-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--mute);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.signal-dot.done   { background: var(--trace); box-shadow: 0 0 8px rgba(79,216,196,0.5); }
+.signal-dot.active { background: var(--pulse); box-shadow: 0 0 10px rgba(255,122,69,0.6); }
+
+@keyframes trace-flow {
+  0%   { stroke-dashoffset: 24; }
+  100% { stroke-dashoffset: 0; }
+}
+.trace-line-active {
+  stroke-dasharray: 4 4;
+  animation: trace-flow 0.6s linear infinite;
+}
+
+@keyframes blink-cursor {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.type-cursor { animation: blink-cursor 1s step-end infinite; }

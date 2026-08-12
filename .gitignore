@@ -1,0 +1,37 @@
+# Credentials and local environment configuration
+.env
+.env.*
+!.env.example
+
+# Python virtual environments and caches
+.venv/
+.venv-*/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Node build/dependency artifacts
+node_modules/
+frontend/node_modules/
+frontend/dist/
+npm-cache/
+
+# Local data and generated application state
+*.db
+*.sqlite
+*.sqlite3
+*.log
+chroma_db/
+backend/chroma_db/
+backend/uploads/
+uploads/
+pip-cache/
+
+# Tooling and editor state
+.tools/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,141 @@
+# Full production Render Blueprint. The existing render.yaml intentionally
+# remains the zero-credential public demo deployment.
+#
+# This topology uses Postgres + pgvector as the shared vector store so the API
+# and ARQ worker never depend on separate ephemeral Chroma directories.
+services:
+  - type: web
+    name: neuralrag-production-api
+    runtime: docker
+    region: singapore
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /status
+    preDeployCommand: alembic upgrade head
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LLM_PROVIDER
+        value: openai
+      - key: EMBEDDING_PROVIDER
+        value: openai
+      - key: VECTOR_STORE_PROVIDER
+        value: pgvector
+      - key: PGVECTOR_DIMENSIONS
+        value: "1536"
+      - key: INGESTION_QUEUE_ENABLED
+        value: "true"
+      - key: WS_REDIS_BROADCAST_ENABLED
+        value: "true"
+      - key: PII_REDACTION_ENABLED
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: neuralrag-production-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: neuralrag-production-redis
+          property: connectionString
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: neuralrag-production-frontend
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: neuralrag-production-frontend
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: SECRET_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # Set this in the dashboard after Render assigns the API URL:
+      # https://<api>.onrender.com/api/v1/auth/google/callback
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+
+  - type: worker
+    name: neuralrag-production-worker
+    runtime: docker
+    region: singapore
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    # Docker services use dockerCommand (not startCommand) to override CMD.
+    dockerCommand: arq app.core.ingestion.WorkerSettings
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: EMBEDDING_PROVIDER
+        value: openai
+      - key: VECTOR_STORE_PROVIDER
+        value: pgvector
+      - key: PGVECTOR_DIMENSIONS
+        value: "1536"
+      - key: INGESTION_QUEUE_ENABLED
+        value: "true"
+      - key: PII_REDACTION_ENABLED
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: neuralrag-production-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: neuralrag-production-redis
+          property: connectionString
+      - key: OPENAI_API_KEY
+        fromService:
+          type: web
+          name: neuralrag-production-api
+          envVarKey: OPENAI_API_KEY
+
+  - type: keyvalue
+    name: neuralrag-production-redis
+    region: singapore
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    persistenceMode: journal-snapshot
+    # Private-network callers remain available; no public Redis access.
+    ipAllowList: []
+
+  - type: web
+    name: neuralrag-production-frontend
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    rootDir: frontend
+    autoDeployTrigger: checksPass
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Render injects the API's HTTPS URL at build time. endpoints.js turns
+      # the same URL into WSS for the browser WebSocket client.
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: neuralrag-production-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: VITE_WS_URL
+        fromService:
+          type: web
+          name: neuralrag-production-api
+          envVarKey: RENDER_EXTERNAL_URL
+
+databases:
+  - name: neuralrag-production-db
+    region: singapore
+    plan: basic-1gb

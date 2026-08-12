@@ -1,0 +1,17 @@
+{
+  "chunks": [
+    {"id": "expense-deadline", "text": "Employees must submit expense reports within 30 days of the purchase date to be reimbursed."},
+    {"id": "expense-general", "text": "The reimbursement policy explains which business expenses are eligible for repayment."},
+    {"id": "invoice-4471", "text": "Invoice #4471 was issued on March 3 for the Q1 consulting engagement, totaling $12,400."},
+    {"id": "invoice-general", "text": "Invoices are reviewed by finance before payments are approved."},
+    {"id": "retention-period", "text": "Customer records are retained for seven years to meet the company's SOC 2 data retention policy."},
+    {"id": "security-general", "text": "The security policy documents access controls, encryption, and incident response practices."},
+    {"id": "picnic", "text": "The company picnic is scheduled for the second Saturday of July."}
+  ],
+  "queries": [
+    {"query": "How long do I have to submit an expense claim?", "relevant_chunk_ids": ["expense-deadline"]},
+    {"query": "What does invoice 4471 cover?", "relevant_chunk_ids": ["invoice-4471"]},
+    {"query": "How long are customer records kept?", "relevant_chunk_ids": ["retention-period"]},
+    {"query": "When is the company picnic?", "relevant_chunk_ids": ["picnic"]}
+  ]
+}

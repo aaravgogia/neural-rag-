@@ -1,0 +1,42 @@
+# Zero-external-dependency demo stack: hybrid retrieval + live agent tracing
+# + WebSocket streaming. No Postgres, no Redis, no OpenAI key required.
+#
+#   docker compose -f docker-compose.demo.yml up --build
+#   Frontend: http://localhost:4173/live-demo
+#   Backend:  http://localhost:8000
+version: '3.9'
+
+services:
+  demo-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.demo
+    environment:
+      # Optional -- omit these and the login page correctly shows "not
+      # configured yet" instead of a broken redirect (verified in tests).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/auth/google/callback}
+      FRONTEND_URL: http://localhost:4173
+      ALLOWED_ORIGINS: http://localhost:4173
+      DATABASE_URL: sqlite+aiosqlite:///./neuralrag.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - demo-db:/app
+    restart: unless-stopped
+
+  demo-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+        VITE_WS_URL: ws://localhost:8000
+    ports:
+      - "4173:3000"
+    depends_on:
+      - demo-api
+    restart: unless-stopped
+
+volumes:
+  demo-db:

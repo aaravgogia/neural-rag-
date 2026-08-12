@@ -1,0 +1,27 @@
+# Minimal dependency set for app.main_demo:app -- the WebSocket + hybrid
+# retrieval + live agent trace demo. Deliberately excludes langchain,
+# chromadb, sqlalchemy, redis, etc: none of that is needed to run the demo,
+# and none of it needs an OpenAI/Postgres/Redis credential to boot.
+#
+# For the full production backend (app.main:app) with real auth, real
+# vector storage, and a real LLM, use requirements.txt instead.
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+websockets==12.0
+rank-bm25==0.2.2
+scikit-learn==1.4.0
+numpy==1.26.3
+nltk==3.8.1
+langgraph==0.0.26
+
+# Google auth: none of this needs langchain/chromadb, so it's cheap to
+# include here. SQLite (aiosqlite) instead of Postgres means zero managed
+# database setup is required to deploy this -- the .db file lives next to
+# the app. Swap DATABASE_URL to Postgres later without any code changes.
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+python-jose[cryptography]==3.3.0
+httpx==0.25.2
+pydantic-settings==2.1.0
+pydantic[email]==2.5.2
+python-multipart==0.0.6

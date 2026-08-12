@@ -1,0 +1,21 @@
+# Deployable, zero-managed-service image: hybrid retrieval + live agent
+# trace + WebSocket demo + Google auth (app.main_demo:app). No OpenAI key,
+# no Postgres/Redis, no managed database -- users are stored in SQLite
+# inside the container. Google auth is optional: omit GOOGLE_CLIENT_ID/
+# SECRET and the login page correctly shows "not configured yet" instead
+# of failing (verified in tests) -- this is what makes "run it live" and
+# "sign in" both work out of the box once Google credentials are added.
+FROM python:3.11-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+COPY requirements-demo.txt .
+RUN pip install --no-cache-dir -r requirements-demo.txt
+COPY app/config.py app/config.py
+COPY app/__init__.py app/__init__.py
+COPY app/core app/core
+COPY app/api app/api
+COPY app/models app/models
+COPY app/main_demo.py app/main_demo.py
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:${PORT:-8000}/ || exit 1
+CMD uvicorn app.main_demo:app --host 0.0.0.0 --port ${PORT:-8000}

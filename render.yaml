@@ -1,0 +1,18 @@
+# Render.com blueprint -- deploys the zero-credential demo backend
+# (hybrid retrieval + live agent trace + WebSocket) as a free web service.
+# This is the service the frontend's "Run it live" button talks to.
+#
+# Deploy: push this repo to GitHub, then on Render: New -> Blueprint ->
+# select the repo. Render reads this file automatically.
+services:
+  - type: web
+    name: neuralrag-demo-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile.demo
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8000
+    autoDeploy: true
