@@ -40,6 +40,30 @@ class HashingEmbeddings:
         return self._encode([text])[0]
 
 
+class LazySentenceTransformerEmbeddings:
+    """Defer Torch/model allocation until the first ingestion or query.
+
+    This lets health checks and low-memory hosts start without allocating the
+    sentence-transformer model. The full semantic model is still used when a
+    request actually calls ``embed_documents`` or ``embed_query``.
+    """
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        self._delegate = None
+
+    def _get_delegate(self):
+        if self._delegate is None:
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            self._delegate = HuggingFaceEmbeddings(model_name=self.model_name)
+        return self._delegate
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self._get_delegate().embed_documents(texts)
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._get_delegate().embed_query(text)
+
+
 def create_embedding_function():
     """Return the embedding implementation selected by EMBEDDING_PROVIDER."""
     provider = settings.EMBEDDING_PROVIDER.strip().lower()
@@ -49,8 +73,7 @@ def create_embedding_function():
         from langchain_openai import OpenAIEmbeddings
         return OpenAIEmbeddings(model=settings.EMBEDDING_MODEL, openai_api_key=settings.OPENAI_API_KEY)
     if provider in {"", "sentence_transformers", "sentence-transformers"}:
-        from langchain_community.embeddings import HuggingFaceEmbeddings
-        return HuggingFaceEmbeddings(model_name=settings.SENTENCE_TRANSFORMER_MODEL)
+        return LazySentenceTransformerEmbeddings(settings.SENTENCE_TRANSFORMER_MODEL)
     if provider == "hashing":
         return HashingEmbeddings(settings.PGVECTOR_DIMENSIONS)
     raise ValueError(f"Unsupported EMBEDDING_PROVIDER: {provider}")

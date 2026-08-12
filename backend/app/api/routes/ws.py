@@ -235,7 +235,19 @@ _DEMO_DOCS = [
     RetrievedChunk(id="d5", text="SOC 2 compliance mandates that customer data be retained for a period of seven years.", metadata={"source": "security.pdf"}),
     RetrievedChunk(id="d6", text="The onboarding checklist includes setting up a company email, laptop provisioning, and Slack access.", metadata={"source": "onboarding.pdf"}),
 ]
-_agent = ObservableRAGAgent(HybridRetriever(_DEMO_DOCS), SemanticCache())
+_agent: ObservableRAGAgent | None = None
+
+
+def _demo_agent() -> ObservableRAGAgent:
+    """Build the demo retriever on first use, never during application import.
+
+    Constructing a real DenseIndex can download/load a sentence-transformer.
+    Deferring it preserves a fast, low-memory health-check startup.
+    """
+    global _agent
+    if _agent is None:
+        _agent = ObservableRAGAgent(HybridRetriever(_DEMO_DOCS), SemanticCache())
+    return _agent
 
 
 def _guest() -> Participant:
@@ -337,7 +349,7 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             async def trace_callback(event: dict):
                 await manager.broadcast(session_id, event)
 
-            await _agent.run_streaming(question, namespace=None, trace_cb=trace_callback, session_id=session_id)
+            await _demo_agent().run_streaming(question, namespace=None, trace_cb=trace_callback, session_id=session_id)
     except WebSocketDisconnect:
         pass
     finally:
