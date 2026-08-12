@@ -128,8 +128,19 @@ def test_pgvector_supports_sentence_transformer_embeddings_for_free_neon_stack(m
     assert PgvectorVectorStore().embeddings is sentinel
 
 
-def test_pgvector_rejects_unsupported_embeddings_before_database_use(monkeypatch):
+def test_pgvector_supports_lightweight_hashing_embeddings_for_render_free(monkeypatch):
     monkeypatch.setattr(vector_store_module.settings, "DATABASE_URL", "postgresql+asyncpg://test")
     monkeypatch.setattr(vector_store_module.settings, "EMBEDDING_PROVIDER", "hashing")
-    with pytest.raises(RuntimeError, match="requires openai or sentence_transformers"):
+    monkeypatch.setattr(vector_store_module.settings, "PGVECTOR_DIMENSIONS", 384)
+    store = PgvectorVectorStore()
+
+    vector = store.embeddings.embed_query("invoice 4471")
+    assert len(vector) == 384
+    assert any(vector)
+
+
+def test_pgvector_rejects_unsupported_embeddings_before_database_use(monkeypatch):
+    monkeypatch.setattr(vector_store_module.settings, "DATABASE_URL", "postgresql+asyncpg://test")
+    monkeypatch.setattr(vector_store_module.settings, "EMBEDDING_PROVIDER", "unsupported")
+    with pytest.raises(RuntimeError, match="requires openai, sentence_transformers, or hashing"):
         PgvectorVectorStore()

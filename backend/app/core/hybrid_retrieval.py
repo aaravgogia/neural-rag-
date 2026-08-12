@@ -49,6 +49,8 @@ def embedding_runtime_status() -> str:
         if not find_spec("sentence_transformers"):
             return "HashingVectorizer fallback (sentence-transformers is not installed)"
         return f"SentenceTransformer (real; {settings.SENTENCE_TRANSFORMER_MODEL}, lazy loaded)"
+    if provider == "hashing":
+        return "HashingVectorizer (lightweight configured backend)"
     return f"HashingVectorizer fallback (unsupported EMBEDDING_PROVIDER={provider!r})"
 
 
@@ -157,6 +159,10 @@ class DenseIndex:
             if provider in {"", "sentence_transformers", "sentence-transformers"}:
                 model = self._get_sentence_transformer()
                 return self._normalise(np.asarray(model.encode(texts, convert_to_numpy=True, show_progress_bar=False), dtype=np.float32))
+            if provider == "hashing":
+                if self._fallback is None:
+                    self._fallback = HashingVectorizer(n_features=384, alternate_sign=False, norm="l2", tokenizer=_tokenize, token_pattern=None, lowercase=False)
+                return self._fallback.transform(texts).toarray().astype(np.float32)
             raise RuntimeError(f"Unsupported EMBEDDING_PROVIDER: {provider}")
         except Exception as error:
             # The public demo deliberately remains zero-download/zero-key.

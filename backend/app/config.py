@@ -139,8 +139,8 @@ class Settings(BaseSettings):
         if self.VECTOR_STORE_PROVIDER.strip().lower() == "pgvector":
             if not self.DATABASE_URL.startswith("postgresql"):
                 raise RuntimeError("VECTOR_STORE_PROVIDER=pgvector requires a PostgreSQL DATABASE_URL")
-            if self.EMBEDDING_PROVIDER.strip().lower() not in {"openai", "sentence_transformers", "sentence-transformers"}:
-                raise RuntimeError("VECTOR_STORE_PROVIDER=pgvector requires openai or sentence_transformers embeddings")
+            if self.EMBEDDING_PROVIDER.strip().lower() not in {"openai", "sentence_transformers", "sentence-transformers", "hashing"}:
+                raise RuntimeError("VECTOR_STORE_PROVIDER=pgvector requires openai, sentence_transformers, or hashing embeddings")
         if not self.FRONTEND_URL.startswith("https://"):
             raise RuntimeError("FRONTEND_URL must use HTTPS in production")
         if any(urlparse(origin).scheme != "https" for origin in self.allowed_origins):

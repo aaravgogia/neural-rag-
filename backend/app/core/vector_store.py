@@ -17,6 +17,29 @@ from app.models.database import AsyncSessionLocal
 logger = logging.getLogger(__name__)
 
 
+class HashingEmbeddings:
+    """Small, deterministic embedding adapter for constrained deployments.
+
+    It matches the LangChain embedding interface while avoiding Torch and model
+    downloads.  It is intentionally a fallback-quality retrieval mode; BM25
+    remains the strong exact-match leg in the hybrid pipeline.
+    """
+    def __init__(self, dimensions: int = 384):
+        from sklearn.feature_extraction.text import HashingVectorizer
+        self._vectorizer = HashingVectorizer(
+            n_features=dimensions, alternate_sign=False, norm="l2", lowercase=True
+        )
+
+    def _encode(self, texts: List[str]) -> List[List[float]]:
+        return self._vectorizer.transform(texts).toarray().astype("float32").tolist()
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self._encode(texts)
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._encode([text])[0]
+
+
 def create_embedding_function():
     """Return the embedding implementation selected by EMBEDDING_PROVIDER."""
     provider = settings.EMBEDDING_PROVIDER.strip().lower()
@@ -28,6 +51,8 @@ def create_embedding_function():
     if provider in {"", "sentence_transformers", "sentence-transformers"}:
         from langchain_community.embeddings import HuggingFaceEmbeddings
         return HuggingFaceEmbeddings(model_name=settings.SENTENCE_TRANSFORMER_MODEL)
+    if provider == "hashing":
+        return HashingEmbeddings(settings.PGVECTOR_DIMENSIONS)
     raise ValueError(f"Unsupported EMBEDDING_PROVIDER: {provider}")
 
 
@@ -106,8 +131,8 @@ class PgvectorVectorStore(VectorStoreBackend):
     def __init__(self):
         if not settings.DATABASE_URL.startswith("postgresql"):
             raise RuntimeError("VECTOR_STORE_PROVIDER=pgvector requires a PostgreSQL DATABASE_URL")
-        if settings.EMBEDDING_PROVIDER.strip().lower() not in {"openai", "sentence_transformers", "sentence-transformers"}:
-            raise RuntimeError("VECTOR_STORE_PROVIDER=pgvector requires openai or sentence_transformers embeddings")
+        if settings.EMBEDDING_PROVIDER.strip().lower() not in {"openai", "sentence_transformers", "sentence-transformers", "hashing"}:
+            raise RuntimeError("VECTOR_STORE_PROVIDER=pgvector requires openai, sentence_transformers, or hashing embeddings")
         self.embeddings = create_embedding_function()
         self.table = settings.PGVECTOR_TABLE_NAME
         if not self.table.replace("_", "").isalnum():

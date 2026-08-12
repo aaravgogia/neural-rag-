@@ -16,7 +16,9 @@ services:
       - key: MISTRAL_MODEL
         value: mistral-small-latest
       - key: EMBEDDING_PROVIDER
-        value: sentence_transformers
+        # Render Free has a 512 MB RAM cap. Hashing avoids loading Torch plus
+        # the local sentence-transformer model during API startup.
+        value: hashing
       # Persist vectors in Neon, rather than ephemeral Chroma in Render.
       - key: VECTOR_STORE_PROVIDER
         value: pgvector

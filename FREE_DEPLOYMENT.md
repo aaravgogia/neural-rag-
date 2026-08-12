@@ -39,7 +39,7 @@ Use [render-free.yaml](render-free.yaml) as the Blueprint, not the existing
 ENVIRONMENT=production
 LLM_PROVIDER=mistral
 MISTRAL_MODEL=mistral-small-latest
-EMBEDDING_PROVIDER=sentence_transformers
+EMBEDDING_PROVIDER=hashing
 VECTOR_STORE_PROVIDER=pgvector
 PGVECTOR_DIMENSIONS=384
 INGESTION_QUEUE_ENABLED=false
@@ -66,10 +66,11 @@ worker. This makes large uploads slower and subject to the free service’s
 request/runtime constraints.
 
 On first boot, the backend's existing idempotent database bootstrap creates
-the application tables plus the pgvector extension/table. Its 384-dimension
-local sentence-transformer vectors are therefore persistent in Neon, instead
-of disappearing with Render’s local filesystem. Teams that prefer managed
-migrations can run `alembic upgrade head` separately before deployment.
+the application tables plus the pgvector extension/table. The free deployment
+uses lightweight 384-dimension hashing vectors so it remains inside Render
+Free's 512 MB memory limit; it retains BM25 hybrid retrieval but has weaker
+semantic matching than the sentence-transformer option. Teams that prefer
+managed migrations can run `alembic upgrade head` separately before deployment.
 
 ## 3. Deploy the frontend on Vercel
 
