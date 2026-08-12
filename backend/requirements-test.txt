@@ -1,4 +1,4 @@
 -r requirements-demo.txt
 pytest==7.4.4
-pytest-asyncio==0.23.3
+pytest-asyncio==1.4.0
 redis==5.0.1
