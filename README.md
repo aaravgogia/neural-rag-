@@ -97,7 +97,7 @@ chat, documents, analytics) proving the fixes work.
 - `from app.main import app` succeeds with no OpenAI or Anthropic key; it reports the intentional offline StubLLM fallback
 
 **NOT verified (needs real credentials/services this sandbox doesn't have):**
-- The actual LangChain/LangGraph RAG pipeline (needs a real `OPENAI_API_KEY`)
+- The actual LangChain/LangGraph RAG pipeline (needs a real provider key such as `MISTRAL_API_KEY`)
 - Postgres/Redis-backed persistence (needs running services — docker-compose is provided but untested end-to-end here)
 - Google OAuth login flow (needs real `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and a live redirect)
 
@@ -105,11 +105,12 @@ chat, documents, analytics) proving the fixes work.
 
 ### LLM and embedding providers
 
-Set `LLM_PROVIDER=auto` (default) to use OpenAI when `OPENAI_API_KEY` is present,
-then Anthropic when `ANTHROPIC_API_KEY` is present. Set it explicitly to `openai`
-or `anthropic` to select one. If no usable key or optional provider package is
-available, NeuralRAG logs a clear warning and streams responses through the existing
-offline `StubLLM`, so demo mode never fails at startup.
+`LLM_PROVIDER=mistral` is the default. Set `MISTRAL_API_KEY` to generate real
+Mistral answers with `MISTRAL_MODEL=mistral-small-latest`. You can instead set
+`LLM_PROVIDER` to `openai`, `anthropic`, `gemini`, or `auto`; auto tries configured
+providers in order. If no usable key or optional provider package is available,
+NeuralRAG logs a clear warning and streams responses through the existing offline
+`StubLLM`, so demo mode never fails at startup.
 
 `EMBEDDING_PROVIDER=sentence_transformers` is the default and uses the local
 `all-MiniLM-L6-v2` model. Set `EMBEDDING_PROVIDER=openai` with `OPENAI_API_KEY`
@@ -139,7 +140,7 @@ instead of a browser-session JWT.
 
 ```bash
 cp .env.example .env
-# fill in OPENAI_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+# fill in MISTRAL_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 docker-compose up --build
 # Frontend: http://localhost:3000

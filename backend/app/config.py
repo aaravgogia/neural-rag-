@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     MISTRAL_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
-    LLM_PROVIDER: str = "auto"
+    # Mistral is the default real-provider choice. Set this to `auto` to
+    # retain ordered provider discovery, or select another provider explicitly.
+    LLM_PROVIDER: str = "mistral"
     GROQ_API_KEY: Optional[str] = None
 
     GOOGLE_CLIENT_ID: str = ""

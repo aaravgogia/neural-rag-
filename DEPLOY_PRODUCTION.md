@@ -8,8 +8,9 @@ Vite static site.
 ## Before you start
 
 1. Push this repository to GitHub and select the branch you intend to deploy.
-2. Create or choose an OpenAI API key. This Blueprint uses OpenAI for both the
-   production LLM and 1536-dimension embeddings stored in pgvector.
+2. Create or choose a Mistral API key. This Blueprint uses Mistral for the
+   production LLM and local 384-dimension sentence-transformer embeddings in
+   pgvector.
 3. In Google Cloud Console, create an OAuth **Web application** client. Do not
    set its redirect URI until Render assigns the API URL in step 3.
 
@@ -33,12 +34,12 @@ Render will prompt for the Blueprint values marked `sync: false`. Enter:
 | Variable | Where | Value |
 | --- | --- | --- |
 | `SECRET_KEY` | API | A fresh random secret of at least 32 characters; for example `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
-| `OPENAI_API_KEY` | API | Your real OpenAI key. The worker securely references this API-service variable. |
+| `MISTRAL_API_KEY` | API | Your real Mistral key. The worker securely references this API-service variable. |
 | `GOOGLE_CLIENT_ID` | API | Google OAuth web-client ID |
 | `GOOGLE_CLIENT_SECRET` | API | Google OAuth web-client secret |
 | `GOOGLE_REDIRECT_URI` | API | Leave for step 3 if the API URL is not assigned yet. |
 
-Never set `OPENAI_API_KEY`, OAuth secrets, or `SECRET_KEY` as `VITE_*`
+Never set `MISTRAL_API_KEY`, OAuth secrets, or `SECRET_KEY` as `VITE_*`
 variables: Vite publishes those values to every browser.
 
 ## 2. First deployment and database setup
@@ -63,8 +64,8 @@ neuralrag-production-redis    Available
 ```
 
 Open `https://<your-api>.onrender.com/status`. It must return JSON with
-`"status": "ok"`. The API startup log should report **ChatOpenAI (real)** and
-**OpenAI embeddings (real)**, not a StubLLM or hashing fallback.
+`"status": "ok"`. The API startup log should report **ChatMistralAI (real)** and
+**SentenceTransformer (real)**, not a StubLLM or hashing fallback.
 
 ## 3. Connect frontend and Google OAuth
 

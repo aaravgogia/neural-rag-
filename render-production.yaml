@@ -18,13 +18,13 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: LLM_PROVIDER
-        value: openai
+        value: mistral
       - key: EMBEDDING_PROVIDER
-        value: openai
+        value: sentence_transformers
       - key: VECTOR_STORE_PROVIDER
         value: pgvector
       - key: PGVECTOR_DIMENSIONS
-        value: "1536"
+        value: "384"
       - key: INGESTION_QUEUE_ENABLED
         value: "true"
       - key: WS_REDIS_BROADCAST_ENABLED
@@ -52,7 +52,7 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
       - key: SECRET_KEY
         sync: false
-      - key: OPENAI_API_KEY
+      - key: MISTRAL_API_KEY
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
@@ -77,11 +77,11 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: EMBEDDING_PROVIDER
-        value: openai
+        value: sentence_transformers
       - key: VECTOR_STORE_PROVIDER
         value: pgvector
       - key: PGVECTOR_DIMENSIONS
-        value: "1536"
+        value: "384"
       - key: INGESTION_QUEUE_ENABLED
         value: "true"
       - key: PII_REDACTION_ENABLED
@@ -95,11 +95,11 @@ services:
           type: keyvalue
           name: neuralrag-production-redis
           property: connectionString
-      - key: OPENAI_API_KEY
+      - key: MISTRAL_API_KEY
         fromService:
           type: web
           name: neuralrag-production-api
-          envVarKey: OPENAI_API_KEY
+          envVarKey: MISTRAL_API_KEY
 
   - type: keyvalue
     name: neuralrag-production-redis

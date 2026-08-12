@@ -1,4 +1,4 @@
-# $0 deployment: Render + Vercel + Neon + Upstash + Gemini
+# Low-cost deployment: Render + Vercel + Neon + Upstash + Mistral
 
 This is a real, low-traffic deployment path—not an “unlimited free
 production” claim. It uses:
@@ -9,7 +9,7 @@ production” claim. It uses:
 | Frontend | Vercel Hobby | Vite static site |
 | Database | Neon Free | Postgres application data and pgvector embeddings |
 | Cache / queue features | Upstash Free | Redis-compatible TLS cache, rate limits, and room broadcast |
-| LLM | Gemini API Free tier | Real Flash-model answers |
+| LLM | Mistral API | Real Mistral-model answers |
 
 ## 1. Create the accounts and values
 
@@ -25,8 +25,8 @@ production” claim. It uses:
 2. Create an Upstash Redis database with TLS enabled. Copy its **Redis TCP**
    URL (not the REST URL), which begins `rediss://`. The app uses `redis-py`,
    which accepts `rediss://` directly.
-3. Create a Gemini API key in Google AI Studio. This is server-only:
-   never put `GEMINI_API_KEY` in Vercel or any `VITE_*` variable.
+3. Create a Mistral API key. This is server-only: never put
+   `MISTRAL_API_KEY` in Vercel or any `VITE_*` variable.
 4. Create a Google OAuth web client if you want Google login. You will add the
    redirect URI after Render has assigned the API URL.
 
@@ -37,8 +37,8 @@ Use [render-free.yaml](render-free.yaml) as the Blueprint, not the existing
 
 ```text
 ENVIRONMENT=production
-LLM_PROVIDER=gemini
-GEMINI_MODEL=gemini-2.5-flash
+LLM_PROVIDER=mistral
+MISTRAL_MODEL=mistral-small-latest
 EMBEDDING_PROVIDER=sentence_transformers
 VECTOR_STORE_PROVIDER=pgvector
 PGVECTOR_DIMENSIONS=384
@@ -50,7 +50,7 @@ In the Render dashboard, set the Blueprint’s `sync: false` values:
 ```text
 DATABASE_URL=<Neon URL from step 1>
 REDIS_URL=<Upstash rediss:// TCP URL from step 1>
-GEMINI_API_KEY=<Gemini API key>
+MISTRAL_API_KEY=<Mistral API key>
 SECRET_KEY=<at least 32 random characters>
 FRONTEND_URL=<set after Vercel deployment>
 ALLOWED_ORIGINS=<set after Vercel deployment>
@@ -123,13 +123,11 @@ localhost variation.
   as commands. If it is unavailable or exhausted, this app starts and falls
   back to per-process cache/rate limits; cross-instance WebSocket broadcasting
   is then unavailable.
-- **Gemini:** Google exposes free Gemini API usage, but quotas vary by model,
-  account, region, and project and can change. Rate limits apply by project
-  (RPM, token/minute, and requests/day), not by API key; check AI Studio’s
-  Rate Limits dashboard before launch. Treat `429 RESOURCE_EXHAUSTED` as an
-  expected capacity boundary, not a deploy bug. Free-tier data handling and
-  terms may differ from paid offerings—review Google’s current terms before
-  sending sensitive customer content.
+- **Mistral:** the API key is billed according to your Mistral account and
+  selected model. This means the infrastructure can remain free, but this
+  configuration is no longer a genuinely $0 end-to-end stack. Set a usage
+  limit in Mistral before launch and treat provider `429` responses as an
+  expected capacity boundary, not a deploy bug.
 - **No worker:** inline ingestion is correct for a single free API but is not
   suitable for long-running or high-volume uploads. Upgrade to a worker before
   relying on background throughput.
@@ -137,7 +135,7 @@ localhost variation.
 ## Final checklist
 
 1. `https://<render-api>/status` returns `{"status":"ok",...}`.
-2. Startup logs say `Gemini GenAI (real; LLM_PROVIDER=gemini)`, not StubLLM.
+2. Startup logs say `ChatMistralAI (real; LLM_PROVIDER=mistral)`, not StubLLM.
 3. Upload a small PDF, wait for `queued → processing → done`, then ask a
    question and verify citations arrive.
 4. Confirm Neon contains `vector_embeddings` rows after an upload.
@@ -145,7 +143,6 @@ localhost variation.
    request recovers from the expected Render cold start.
 
 Current provider facts and limits should be rechecked before public launch:
-[Gemini rate limits](https://ai.google.dev/gemini-api/docs/rate-limits),
 [Render free-service limits](https://render.com/docs/free),
 [Upstash free-tier details](https://upstash.com/blog/upstash-vs-redis-cloud-a-2026-comparison),
 and [Neon connection guidance](https://neon.com/docs/connect/connection-errors).
