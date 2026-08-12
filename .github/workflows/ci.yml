@@ -119,7 +119,7 @@ jobs:
           --build-arg VITE_API_URL=http://localhost:8000
           --build-arg VITE_WS_URL=ws://localhost:8000
           --tag neuralrag-frontend-ci frontend
-      - uses: aquasecurity/trivy-action@0.28.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: neuralrag-frontend-ci
           format: table
