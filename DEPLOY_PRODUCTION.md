@@ -108,11 +108,13 @@ private service URLs and `http://localhost` do not.
 
 ## PII redaction prerequisite
 
-`PII_REDACTION_ENABLED=true` is enabled by the production Blueprint. The full
-[backend Dockerfile](backend/Dockerfile) now runs
-`python -m spacy download en_core_web_sm`, so Presidio has its NER model in a
-fresh production image. Do not use `Dockerfile.demo` for this path: the demo
-intentionally omits the heavyweight Presidio/spaCy dependencies.
+`PII_REDACTION_ENABLED=true` is enabled by the production Blueprint. The spaCy
+`en_core_web_sm` download is optional because it is fetched from GitHub, which
+managed Docker builders can intermittently fail to reach. A normal build uses
+the tested regex PII fallback and logs that mode. If you need Presidio’s full
+NER detection, rebuild with Docker build argument `INSTALL_SPACY_MODEL=true`
+after confirming GitHub downloads work in your deployment region. Do not use
+`Dockerfile.demo` for this path: the demo omits the Presidio/spaCy dependencies.
 
 ## Final smoke test
 

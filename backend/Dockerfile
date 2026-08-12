@@ -3,10 +3,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y gcc g++ libpq-dev curl && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# Presidio uses this model for named-entity recognition.  Installing it during
-# the full production image build avoids a silent regex-only fallback at first
-# ingestion when PII_REDACTION_ENABLED=true.
-RUN python -m spacy download en_core_web_sm
+# The language model is hosted on GitHub, which is intermittently unavailable
+# from managed Docker builders. Keep production builds reliable by making the
+# optional model opt-in; PIIRedactor logs and uses its regex fallback otherwise.
+ARG INSTALL_SPACY_MODEL=false
+RUN if [ "$INSTALL_SPACY_MODEL" = "true" ]; then python -m spacy download en_core_web_sm; fi
 RUN groupadd --system appgroup && useradd --system --gid appgroup --create-home appuser \
     && mkdir -p /app/chroma_db /app/uploads \
     && chown -R appuser:appgroup /app

@@ -104,6 +104,7 @@ workspace returns HTTP 503 rather than redirecting to a broken IdP flow.
 
 ```bash
 pip install -r backend/requirements.txt
+# Optional; without it PII redaction uses the tested regex fallback.
 python -m spacy download en_core_web_sm
 cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
