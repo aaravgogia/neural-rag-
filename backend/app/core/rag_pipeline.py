@@ -1,16 +1,9 @@
 from __future__ import annotations
 import logging
-from typing import List, Optional, AsyncGenerator, TYPE_CHECKING
-
-try:  # Lazy-compatible so safety tests/demo tooling do not need production LLM SDKs.
-    from langchain_openai import ChatOpenAI
-    from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-    from langchain.schema import BaseMessage
-except ImportError:  # pragma: no cover - production requirements provide these
-    ChatOpenAI = ChatPromptTemplate = MessagesPlaceholder = None
-    BaseMessage = object
+from typing import List, Optional, AsyncGenerator, TYPE_CHECKING, Any
 
 from app.config import settings
+from app.core.llm_provider import LLMProvider, get_llm_provider
 from app.core.prompt_safety import filter_retrieved_chunks
 if TYPE_CHECKING:
     from app.core.vector_store import VectorStoreManager
@@ -28,22 +21,13 @@ Context:
 class RAGPipeline:
     """Simple (non-agentic) LangChain RAG pipeline."""
 
-    def __init__(self, vector_store: VectorStoreManager):
-        if ChatOpenAI is None:
-            raise RuntimeError("RAGPipeline requires the full production LangChain/OpenAI dependencies")
+    def __init__(self, vector_store: VectorStoreManager, llm_provider: LLMProvider | None = None):
         self.vector_store = vector_store
-        self.llm = ChatOpenAI(
-            model=settings.LLM_MODEL,
-            temperature=settings.TEMPERATURE,
-            max_tokens=settings.MAX_TOKENS,
-            openai_api_key=settings.OPENAI_API_KEY,
-            streaming=True
-        )
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", SYSTEM_PROMPT),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{question}")
-        ])
+        # The non-agent chat endpoint must use the same provider selection as
+        # the LangGraph path.  Creating ChatOpenAI here previously made a
+        # Mistral/Anthropic/Gemini deployment crash at boot without an OpenAI
+        # key, despite the configured provider being healthy.
+        self.llm = llm_provider or get_llm_provider()
 
     def _format_docs(self, docs) -> str:
         formatted = []
@@ -60,14 +44,31 @@ class RAGPipeline:
             logger.warning("Excluded %d retrieved chunk(s) before LLM context construction", len(excluded))
         return safe
 
-    async def query(self, question: str, user_id: str, workspace_id: str, chat_history: Optional[List[BaseMessage]] = None, namespace: Optional[str] = None) -> dict:
+    @staticmethod
+    def _history_text(chat_history: Optional[List[Any]]) -> str:
+        """Render optional LangChain-style history without requiring LangChain."""
+        if not chat_history:
+            return ""
+        rendered = []
+        for message in chat_history:
+            content = getattr(message, "content", str(message))
+            role = getattr(message, "type", message.__class__.__name__).replace("Message", "")
+            rendered.append(f"{role}: {content}")
+        return "\n".join(rendered)
+
+    def _build_prompt(self, context: str, question: str, chat_history: Optional[List[Any]]) -> str:
+        history = self._history_text(chat_history)
+        history_section = f"\nConversation history:\n{history}\n" if history else ""
+        return f"{SYSTEM_PROMPT.format(context=context)}{history_section}\nQuestion: {question}\nAnswer:"
+
+    async def query(self, question: str, user_id: str, workspace_id: str, chat_history: Optional[List[Any]] = None, namespace: Optional[str] = None) -> dict:
         relevant_docs = await self.vector_store.similarity_search(
             query=question, user_id=user_id, workspace_id=workspace_id, k=settings.TOP_K_RESULTS, namespace=namespace
         )
         relevant_docs = self._safe_docs(relevant_docs)
         context = self._format_docs(relevant_docs)
-        messages = self.prompt.format_messages(context=context, chat_history=chat_history or [], question=question)
-        response = await self.llm.ainvoke(messages)
+        prompt = self._build_prompt(context, question, chat_history)
+        response = "".join([chunk async for chunk in self.llm.generate(prompt, stream=False)])
 
         sources = [
             {
@@ -82,15 +83,15 @@ class RAGPipeline:
             }
             for doc, score in relevant_docs
         ]
-        return {"answer": response.content, "sources": sources, "question": question}
+        return {"answer": response, "sources": sources, "question": question}
 
-    async def stream_query(self, question: str, user_id: str, workspace_id: str, chat_history: Optional[List[BaseMessage]] = None, namespace: Optional[str] = None) -> AsyncGenerator[str, None]:
+    async def stream_query(self, question: str, user_id: str, workspace_id: str, chat_history: Optional[List[Any]] = None, namespace: Optional[str] = None) -> AsyncGenerator[str, None]:
         relevant_docs = await self.vector_store.similarity_search(
             query=question, user_id=user_id, workspace_id=workspace_id, k=settings.TOP_K_RESULTS, namespace=namespace
         )
         relevant_docs = self._safe_docs(relevant_docs)
         context = self._format_docs(relevant_docs)
-        messages = self.prompt.format_messages(context=context, chat_history=chat_history or [], question=question)
-        async for chunk in self.llm.astream(messages):
-            if chunk.content:
-                yield chunk.content
+        prompt = self._build_prompt(context, question, chat_history)
+        async for chunk in self.llm.generate(prompt, stream=True):
+            if chunk:
+                yield chunk
