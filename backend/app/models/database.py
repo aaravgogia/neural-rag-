@@ -4,9 +4,13 @@ from sqlalchemy import Column, String, DateTime, Integer, Text, Boolean, Float, 
 from datetime import datetime
 import uuid
 
-from app.config import async_database_url, settings
+from app.config import async_database_connect_args, async_database_url, settings
 
-engine = create_async_engine(async_database_url(settings.DATABASE_URL), echo=False)
+engine = create_async_engine(
+    async_database_url(settings.DATABASE_URL),
+    echo=False,
+    connect_args=async_database_connect_args(settings.DATABASE_URL),
+)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 class Base(DeclarativeBase):

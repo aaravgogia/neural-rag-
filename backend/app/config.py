@@ -1,17 +1,38 @@
 from functools import cached_property
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from pydantic_settings import BaseSettings
 
 
 def async_database_url(database_url: str) -> str:
-    """Convert a managed-Postgres URL into SQLAlchemy's asyncpg dialect."""
+    """Convert a managed-Postgres URL into SQLAlchemy's asyncpg dialect.
+
+    Neon supplies libpq options such as ``sslmode=require``.  Asyncpg does
+    not understand those URL parameters, so TLS is configured separately via
+    :func:`async_database_connect_args` and unsupported libpq-only options are
+    removed here.
+    """
     if database_url.startswith("postgres://"):
-        return "postgresql+asyncpg://" + database_url[len("postgres://"):]
+        database_url = "postgresql://" + database_url[len("postgres://"):]
     if database_url.startswith("postgresql://"):
-        return "postgresql+asyncpg://" + database_url[len("postgresql://"):]
+        parsed = urlparse(database_url)
+        query = urlencode([(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+                           if key.lower() not in {"sslmode", "channel_binding"}])
+        return urlunparse(parsed._replace(scheme="postgresql+asyncpg", query=query))
     return database_url
+
+
+def async_database_connect_args(database_url: str) -> dict:
+    """Return asyncpg-compatible TLS options for managed Postgres URLs."""
+    if not database_url.startswith(("postgres://", "postgresql://")):
+        return {}
+    options = dict(parse_qsl(urlparse(database_url).query, keep_blank_values=True))
+    if options.get("sslmode", "").lower() in {"require", "verify-ca", "verify-full"}:
+        # asyncpg accepts a boolean TLS request; certificate verification uses
+        # Python/OpenSSL defaults for its hosted public endpoint.
+        return {"ssl": True}
+    return {}
 
 class Settings(BaseSettings):
     ENVIRONMENT: str = "development"

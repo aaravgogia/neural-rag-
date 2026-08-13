@@ -3,13 +3,14 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.config import async_database_url
+from app.config import async_database_connect_args, async_database_url
 
 
-def test_neon_ssl_connection_url_preserves_tls_query_parameters():
+def test_neon_ssl_connection_url_translates_libpq_tls_options_for_asyncpg():
     neon_url = "postgresql://user:password@ep-demo.neon.tech/neondb?sslmode=require&channel_binding=require"
     converted = async_database_url(neon_url)
 
     assert converted.startswith("postgresql+asyncpg://")
-    assert "sslmode=require" in converted
-    assert "channel_binding=require" in converted
+    assert "sslmode=" not in converted
+    assert "channel_binding=" not in converted
+    assert async_database_connect_args(neon_url) == {"ssl": True}
