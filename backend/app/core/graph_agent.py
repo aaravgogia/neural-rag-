@@ -1,14 +1,14 @@
 import logging
+import json
 from typing import TypedDict, Annotated, List, Optional
 import operator
 
-from langchain_openai import ChatOpenAI
 from langchain.schema import BaseMessage, HumanMessage, AIMessage
-from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.config import settings
+from app.core.llm_provider import LLMProvider, get_llm_provider
 from app.core.vector_store import VectorStoreManager
 from app.core.conversation_memory import ConversationMemoryService
 
@@ -35,12 +35,27 @@ class RAGGraphAgent:
     Self-corrects up to 2 times if the grader thinks the answer is weak.
     """
 
-    def __init__(self, vector_store: VectorStoreManager, memory_service: ConversationMemoryService | None = None):
+    def __init__(self, vector_store: VectorStoreManager, memory_service: ConversationMemoryService | None = None, llm_provider: LLMProvider | None = None):
         self.vector_store = vector_store
-        self.llm = ChatOpenAI(model=settings.LLM_MODEL, temperature=0, openai_api_key=settings.OPENAI_API_KEY)
+        # Keep the legacy HTTP agent on the shared provider abstraction too.
+        # It must not instantiate ChatOpenAI when Mistral/Anthropic/Gemini is
+        # selected for the deployment.
+        self.llm = llm_provider or get_llm_provider()
         self.memory = MemorySaver()
         self.conversation_memory = memory_service or ConversationMemoryService()
         self.graph = self._build_graph()
+
+    async def _complete(self, prompt: str) -> str:
+        return "".join([chunk async for chunk in self.llm.generate(prompt, stream=False)])
+
+    @staticmethod
+    def _json_object(value: str) -> dict:
+        """Best-effort JSON parsing; provider prose falls back safely."""
+        try:
+            start, end = value.find("{"), value.rfind("}")
+            return json.loads(value[start:end + 1]) if start >= 0 and end >= start else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
 
     async def analyze_query(self, state: AgentState) -> AgentState:
         try:
@@ -48,15 +63,15 @@ class RAGGraphAgent:
         except Exception:
             logger.warning("Conversation memory unavailable; continuing without history", exc_info=True)
             conversation_context = ""
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """Analyze if this question requires document retrieval.
-            Return JSON: {{"needs_retrieval": true/false, "refined_query": "..."}}
-            Return needs_retrieval=false for greetings, small talk, simple math, or general knowledge."""),
-            ("human", "Conversation memory:\n{conversation_context}\n\nQuestion: {question}")
-        ])
-        from langchain_core.output_parsers import JsonOutputParser
-        chain = prompt | self.llm | JsonOutputParser()
-        result = await chain.ainvoke({"question": state["question"], "conversation_context": conversation_context})
+        prompt = f"""Analyze if this question requires document retrieval.
+Return only JSON: {{"needs_retrieval": true/false, "refined_query": "..."}}.
+Return needs_retrieval=false for greetings, small talk, simple math, or general knowledge.
+
+Conversation memory:
+{conversation_context}
+
+Question: {state["question"]}"""
+        result = self._json_object(await self._complete(prompt))
         return {**state, "needs_retrieval": result.get("needs_retrieval", True),
                 "question": result.get("refined_query", state["question"]), "conversation_context": conversation_context}
 
@@ -79,35 +94,36 @@ class RAGGraphAgent:
 
     async def generate_answer(self, state: AgentState) -> AgentState:
         if state.get("needs_retrieval") and state.get("context"):
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are an expert AI assistant. Answer based on the context.\n\nContext:\n{context}\n\nConversation memory:\n{conversation_context}"),
-                ("human", "{question}")
-            ])
-            chain = prompt | self.llm
-            response = await chain.ainvoke({"context": state["context"], "question": state["question"], "conversation_context": state.get("conversation_context", "")})
-        else:
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are a helpful AI assistant. Use conversation memory to resolve follow-ups.\n{conversation_context}"), ("human", "{question}")
-            ])
-            chain = prompt | self.llm
-            response = await chain.ainvoke({"question": state["question"], "conversation_context": state.get("conversation_context", "")})
+            prompt = f"""You are an expert AI assistant. Answer based on the context.
 
-        answer = response.content
+Context:
+{state["context"]}
+
+Conversation memory:
+{state.get("conversation_context", "")}
+
+Question: {state["question"]}"""
+        else:
+            prompt = f"""You are a helpful AI assistant. Use conversation memory to resolve follow-ups.
+{state.get("conversation_context", "")}
+
+Question: {state["question"]}"""
+
+        answer = await self._complete(prompt)
         messages = state["messages"] + [HumanMessage(content=state["question"]), AIMessage(content=answer)]
         return {**state, "answer": answer, "messages": messages}
 
     async def grade_answer(self, state: AgentState) -> AgentState:
         if not state.get("needs_retrieval"):
             return {**state, "needs_improvement": False}
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """Grade this answer. Return JSON: {{"score": 1-10, "needs_improvement": true/false}}
-            Score >= 7 is good."""),
-            ("human", "Question: {question}\nContext: {context}\nAnswer: {answer}")
-        ])
-        from langchain_core.output_parsers import JsonOutputParser
-        chain = prompt | self.llm | JsonOutputParser()
+        prompt = f"""Grade this answer. Return only JSON: {{"score": 1-10, "needs_improvement": true/false}}.
+Score >= 7 is good.
+
+Question: {state["question"]}
+Context: {state["context"]}
+Answer: {state["answer"]}"""
         try:
-            result = await chain.ainvoke({"question": state["question"], "context": state["context"], "answer": state["answer"]})
+            result = self._json_object(await self._complete(prompt))
             needs_improvement = result.get("needs_improvement", False) and state.get("iteration", 0) < 2
         except Exception:
             needs_improvement = False
