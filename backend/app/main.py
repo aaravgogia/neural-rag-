@@ -80,4 +80,12 @@ app.include_router(status.router)
 
 @app.get("/")
 async def root():
-    return {"message": "NeuralRAG Enterprise Platform", "version": settings.APP_VERSION, "docs": "/docs"}
+    # This deliberately exposes only a boolean.  The frontend needs to know
+    # whether to enable the OAuth entry point, but credentials themselves
+    # must never be exposed to the browser.
+    return {
+        "message": "NeuralRAG Enterprise Platform",
+        "version": settings.APP_VERSION,
+        "docs": "/docs",
+        "auth_configured": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET),
+    }

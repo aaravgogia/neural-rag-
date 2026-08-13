@@ -80,6 +80,7 @@ export default function LandingPage() {
             <a href="#pipeline" className="hover:text-paper transition-colors">how it thinks</a>
             <a href="#proof" className="hover:text-paper transition-colors">proof</a>
             <button onClick={() => navigate('/status')} className="hover:text-paper transition-colors">status</button>
+            <button onClick={() => navigate('/login')} className="hover:text-paper transition-colors">sign in</button>
             <button
               onClick={() => navigate('/live-demo')}
               className="flex items-center gap-1.5 text-paper border border-line-2 rounded px-3 py-1.5 hover:border-trace hover:text-trace transition-colors"
