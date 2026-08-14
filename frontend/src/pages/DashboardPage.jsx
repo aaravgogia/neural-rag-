@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useChatStore } from '../store/chatStore';
 import axios from 'axios';
 import CountUp from 'react-countup';
-import { MessageSquare, FileText, Plus, Upload, Activity, Zap, ChevronRight, Sparkles, ArrowUpRight, Orbit } from 'lucide-react';
+import { MessageSquare, FileText, Plus, Upload, Activity, Zap, ChevronRight, Sparkles, ArrowUpRight, Orbit, AlertTriangle, RefreshCw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import Sidebar from '../components/layout/Sidebar';
 import toast from 'react-hot-toast';
@@ -27,23 +27,39 @@ function StatCard({ icon: Icon, title, value, color, delay }) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const activeWorkspaceId = useAuthStore((state) => state.activeWorkspaceId);
   const { sessions, createSession, fetchSessions } = useChatStore();
   const [analytics, setAnalytics] = useState(null);
+  const [analyticsError, setAnalyticsError] = useState('');
 
-  useEffect(() => { fetchSessions(); fetchAnalytics(); }, []);
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    fetchSessions().catch(() => {});
+    fetchAnalytics();
+  }, [activeWorkspaceId]);
 
   const fetchAnalytics = async () => {
-    try { const { data } = await axios.get(`${API_URL}/api/v1/analytics/dashboard`); setAnalytics(data); }
-    catch {
-      setAnalytics({
-        total_queries: 247, total_documents: 34, total_sessions: 18, queries_today: 12,
-        daily_activity: Array.from({ length: 7 }, (_, i) => ({ date: `Day ${i + 1}`, queries: Math.floor(Math.random() * 50) + 10 })),
-        document_types: [{ type: 'PDF', count: 18 }, { type: 'DOCX', count: 8 }, { type: 'TXT', count: 5 }, { type: 'HTML', count: 3 }]
-      });
+    try {
+      const { data } = await axios.get(`${API_URL}/api/v1/analytics/dashboard`);
+      setAnalytics(data);
+      setAnalyticsError('');
+    } catch {
+      // A dashboard must never silently replace unavailable production data
+      // with invented numbers. Keep the empty state honest and recoverable.
+      setAnalytics({ total_queries: 0, total_documents: 0, total_sessions: 0, queries_today: 0, daily_activity: [], document_types: [] });
+      setAnalyticsError('Live analytics are temporarily unavailable.');
     }
   };
 
-  const handleNewChat = async () => { const session = await createSession({ title: 'New Chat' }); navigate(`/chat/${session.id}`); toast.success('New chat created!'); };
+  const handleNewChat = async () => {
+    try {
+      const session = await createSession({ title: 'New Chat' });
+      navigate(`/chat/${session.id}`);
+      toast.success('New chat created!');
+    } catch (error) {
+      toast.error(error.message || 'Could not create a chat. Select a workspace and try again.');
+    }
+  };
 
   const stats = analytics ? [
     { icon: MessageSquare, title: 'Total Queries', value: analytics.total_queries, color: 'bg-line-2', delay: 0 },
@@ -67,6 +83,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="p-8 space-y-8 max-w-7xl">
+          {analyticsError && <div className="flex items-center justify-between gap-4 rounded-xl border border-pulse/30 bg-pulse/5 px-4 py-3 text-sm text-paper/90"><span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 shrink-0 text-pulse" />{analyticsError}</span><button onClick={fetchAnalytics} className="inline-flex items-center gap-1.5 font-mono text-xs text-trace hover:text-paper"><RefreshCw className="h-3.5 w-3.5" />retry</button></div>}
           <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl border border-line bg-ink-2 p-7">
             <div className="absolute inset-y-0 right-0 w-2/5 signal-grid opacity-50" /><div className="absolute -right-16 -top-16 w-52 h-52 rounded-full bg-trace/10 blur-3xl" />
             <div className="relative max-w-xl"><div className="inline-flex status-chip items-center gap-2 rounded-full px-3 py-1 font-mono text-[10px] text-trace"><span className="w-1.5 h-1.5 rounded-full bg-trace animate-pulse" />PRIVATE KNOWLEDGE SPACE</div><h2 className="font-display text-3xl mt-4 text-paper">Your documents, amplified by context.</h2><p className="text-mute text-sm leading-relaxed mt-2">Upload source material, ask precise questions, and keep every insight inside your own workspace.</p><div className="flex gap-3 mt-5"><button onClick={handleNewChat} className="bg-paper text-ink px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 hover:bg-trace transition-colors">Start exploring <ArrowUpRight className="w-4 h-4" /></button><button onClick={() => navigate('/documents')} className="text-paper border border-line-2 px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 hover:border-trace transition-colors"><Upload className="w-4 h-4" />Add sources</button></div></div>

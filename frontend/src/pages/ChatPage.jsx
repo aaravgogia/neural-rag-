@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChatStore } from '../store/chatStore';
+import { useAuthStore } from '../store/authStore';
 import ReactMarkdown from 'react-markdown';
 import Sidebar from '../components/layout/Sidebar';
 import { Send, Brain, User, Plus, FileText, BookOpen, Sparkles, Zap, MessageSquare, ArrowDown, ThumbsUp, ThumbsDown } from 'lucide-react';
@@ -74,6 +75,7 @@ const SUGGESTIONS = [
 export default function ChatPage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const activeWorkspaceId = useAuthStore((state) => state.activeWorkspaceId);
   const { sessions, currentSession, messages, isLoading, createSession, selectSession, sendMessage, fetchSessions } = useChatStore();
   const [input, setInput] = useState('');
   const [useAgent, setUseAgent] = useState(true);
@@ -81,7 +83,10 @@ export default function ChatPage() {
   const bottomRef = useRef(null);
   const { users: viewers, typists, notifyTyping } = useSessionPresence(sessionId);
 
-  useEffect(() => { fetchSessions(); }, []);
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    fetchSessions().catch(() => toast.error('Could not load chats for this workspace.'));
+  }, [activeWorkspaceId]);
   useEffect(() => { if (sessionId) selectSession(sessionId); }, [sessionId]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
 
